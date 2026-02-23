@@ -1,0 +1,8 @@
+## Interface: 120001
+## Title: WoW Dungeon Assist
+## Notes: Raid control dropdown with ready check, pull timer, and target markers.
+## Author: Nick Burdette
+## Version: 1.0.0
+## SavedVariables: WoWDungeonAssistDB
+
+WoW-Dungeon-Assist.lua
