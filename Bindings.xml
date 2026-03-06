@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="WOWDUNGEONASSIST_TOGGLE_PANEL" header="WOWDUNGEONASSIST">
+		WoWDungeonAssist_TogglePanel()
+	</Binding>
+	<Binding name="CLICK WoWDungeonAssistReadyCheckButton:LeftButton" header="WOWDUNGEONASSIST" />
+	<Binding name="CLICK WoWDungeonAssistCountdownButton:LeftButton" header="WOWDUNGEONASSIST" />
+	<Binding name="CLICK WoWDungeonAssistClearMarkersButton:LeftButton" header="WOWDUNGEONASSIST" />
+</Bindings>

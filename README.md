@@ -1,154 +1,162 @@
 # WoW Dungeon Assist
 
-A lightweight World of Warcraft addon that provides a compact, ElvUI-style raid control panel for party and raid content.
+A compact World of Warcraft party/raid control addon with a dropdown panel for marker control, ready checks, and pull countdowns.
 
 ![Dungeon Assist panel](docs/dungeon-assist-panel.png)
 
 ## Features
 
-- Collapsible panel titled `Dungeon Assist`.
-- Auto-visibility when grouped (`party` or `raid`), hidden when solo.
-- Movable in Blizzard Edit Mode.
-- Class-colored title/text/icons.
-- QUI-inspired dark theming pass:
-  - Cleaner spacing and panel sizing.
-  - Consistent dark surface/border treatment.
-  - Class-accent hover highlights for action buttons and header.
-- Secure action buttons for:
-  - `Ready Check` (checkmark icon).
-  - `Countdown 10` (clock icon + `10`).
-  - `Clear Markers` (clears all raid target markers).
-  - 8 target marker buttons:
-    - Left-click sets that marker on your current target.
-    - Right-click clears that specific marker from your current target (for example, right-click skull clears skull).
-- Saved position and expanded/collapsed state.
-- Slash command support via `/wda`.
+- Collapsible `Dungeon Assist` header panel.
+- Shows automatically when grouped (`party` or `raid`) with visibility modes:
+  - `Group Only`
+  - `Always Show`
+  - `Hidden`
+- Movable through Blizzard Edit Mode.
+- Class-color accent styling with theme presets:
+  - `QUI Dark`
+  - `Slate Steel`
+  - `Ember`
+- Action controls:
+  - `Clear Markers` clears all raid target markers.
+  - Eight target marker buttons.
+    - Left-click sets marker on target.
+    - Right-click clears that specific marker from target (example: right-click skull clears skull).
+  - Ready check icon button.
+  - Countdown icon button with saved default timer value.
+- Permission-aware button states:
+  - Buttons dim/disable when not allowed.
+  - Tooltip shows the reason (for example missing permissions or target).
+- Marker announce toggle (chat message on marker set).
+- Role-aware behavior:
+  - Tank shortcut: optional right-click on ready button starts countdown.
+  - Healer compact mode: tighter panel layout for healers.
+- Mythic+ footer widgets (optional):
+  - Battle res status (`BR`).
+  - Lust lockout status (`Lust Used` / `Lust Ready`).
+- Keybinding support through `Bindings.xml`.
+- Saved settings/profile-lite in `WoWDungeonAssistDB`.
 
 ## Game Version / API Notes
 
 - TOC Interface in this repo: `120001`.
-- Built with secure templates for modern protected-action handling:
-  - `SecureHandlerStateTemplate` for visibility driver.
-  - `SecureActionButtonTemplate` for protected actions (`readycheck`, `countdown`, raid markers).
-  - Registers clicks with `AnyDown` and `AnyUp` for compatibility with `ActionButtonUseKeyDown` behavior.
+- Version in this repo: `1.2.0`.
+- Uses secure templates for protected actions:
+  - `SecureHandlerStateTemplate` for visibility state driver.
+  - `SecureActionButtonTemplate` for ready check/countdown/markers.
+- No direct protected API calls (like `SetRaidTarget`) are made from insecure Lua paths.
 
 ## Installation
 
-1. Download or clone this repo:
+1. Download or clone:
    - [https://github.com/Phrantiks-ai/wow-dungeon-assist](https://github.com/Phrantiks-ai/wow-dungeon-assist)
-2. Place the addon folder here:
+2. Place addon folder at:
    - `World of Warcraft/_retail_/Interface/AddOns/WoW-Dungeon-Assist`
-3. Confirm these files exist in that folder:
+3. Ensure these files exist:
    - `WoW-Dungeon-Assist.toc`
    - `WoW-Dungeon-Assist.lua`
-4. Launch the game and enable `WoW Dungeon Assist` in AddOns.
+   - `Bindings.xml`
+4. Enable `WoW Dungeon Assist` in the AddOns menu.
 5. Run `/reload` after updates.
-
-## WoWUp / GitHub Release Setup
-
-This repo is configured to produce WoWUp-friendly GitHub releases, similar to QUI.
-
-- Workflow file: `.github/workflows/release.yml`
-- Trigger: pushing a tag matching `v*` (example: `v1.0.1`)
-- Output artifact: `WoW-Dungeon-Assist-vX.Y.Z.zip`
-- Zip structure: contains a top-level `WoW-Dungeon-Assist/` addon folder
-- Preview image for clients that support it: `.previews/panel.png`
-
-Release steps:
-
-1. Update addon code and (if needed) bump `## Version` in `WoW-Dungeon-Assist.toc`.
-2. Commit and push `main`.
-3. Create and push a version tag:
-   - `git tag v1.0.1`
-   - `git push origin v1.0.1`
-4. Wait for GitHub Actions to publish the release zip.
-5. Install/update from the GitHub release in WoWUp.
 
 ## Usage
 
-- Join a party or raid: panel appears automatically.
-- Left-click the header to expand/collapse the dropdown.
-- Open Edit Mode to drag and reposition the panel.
-- Use buttons in the dropdown:
-  - `Clear Markers` clears all raid target markers.
-  - Marker grid sets/clears individual target markers.
-  - Bottom-left checkmark runs ready check.
-  - Bottom-right clock runs `/countdown 10`.
+- Click header to expand/collapse dropdown.
+- Open Edit Mode and drag the panel to move.
+- Use top `Clear Markers` to clear all markers.
+- Use marker buttons for per-target set/clear.
+- Use bottom icon buttons for ready check and countdown.
+
+## Config Panel
+
+Open with:
+
+- `/wda config`
+- `/wda options`
+- Interface Options/Settings category: `WoW Dungeon Assist`
+
+Settings available:
+
+- `Panel Scale`
+- `Panel Alpha`
+- `Visibility Mode`
+- `Theme Preset`
+- `Default Countdown`
+- `Lock Mover In Edit Mode`
+- `Announce Marker Sets`
+- `Tank Shortcut (Ready RMB = Countdown)`
+- `Healer Compact Layout`
+- `Mythic+ Footer Widgets`
 
 ## Slash Commands
 
 | Command | Behavior |
 | --- | --- |
-| `/wda show` | Forces the panel visible even when not grouped. |
-| `/wda auto` | Returns to automatic visibility (`show in group, hide solo`). |
+| `/wda config` | Opens addon config panel. |
+| `/wda options` | Alias of `/wda config`. |
+| `/wda show` | Sets visibility mode to Always Show. |
+| `/wda auto` | Sets visibility mode to Group Only. |
 | `/wda hide` | Alias of `/wda auto`. |
-| `/wda reset` | Resets position to defaults and enables forced show. |
-| `/wda where` | Prints the current saved anchor point/offset. |
+| `/wda mode group` | Visibility mode: Group Only. |
+| `/wda mode always` | Visibility mode: Always Show. |
+| `/wda mode hidden` | Visibility mode: Hidden. |
+| `/wda cd 10` | Sets default countdown seconds. |
+| `/wda countdown 10` | Alias of `/wda cd 10`. |
+| `/wda announce` | Toggles marker announce. |
+| `/wda lock` | Toggles mover lock while in Edit Mode. |
+| `/wda reset` | Resets saved panel position and forces Always Show mode. |
+| `/wda where` | Prints current saved anchor position. |
 
-## Permissions and Protected Actions
+## Keybindings
 
-Blizzard protects raid-control actions. This addon uses secure buttons so clicks are executed through secure action attributes/macros.
+Open `Game Menu -> Options -> Keybindings -> WoW Dungeon Assist`.
 
-You may still see actions fail if game permissions are not met, for example:
+Bindings:
 
-- You are not allowed to set markers in the current group context.
-- You do not have a valid target when setting/clearing target markers.
-- Group-role restrictions for ready checks/countdowns in a specific content type.
+- `Toggle Panel`
+- `Ready Check`
+- `Pull Countdown`
+- `Clear Markers`
 
-Combat restrictions:
+## Permissions / Protected Actions
+
+Actions can fail if Blizzard permissions are not met. The addon now shows disabled states and tooltip reasons when this happens.
+
+Common cases:
+
+- Not grouped.
+- No valid target for marker operations.
+- Raid permission limits (not leader/assistant).
+
+Combat notes:
 
 - Header expand/collapse is blocked in combat lockdown.
-- Visibility driver updates delayed by combat are applied after combat ends.
+- Secure attribute updates are queued and applied when combat ends.
 
-## Saved Variables
+## Mythic+ Widget Notes
 
-Saved variable name: `WoWDungeonAssistDB`
+- Lust widget is based on common lust lockout debuffs across group members.
+- BR widget reads known battle-res spell charge state when available.
+- Outside active Mythic+, footer displays muted placeholder values.
 
-Stored keys:
+## WoWUp / GitHub Release Setup
 
-- `point`
-- `relativePoint`
-- `x`
-- `y`
-- `expanded`
+This repo includes tag-based release packaging for WoWUp install-from-URL compatibility.
 
-## Troubleshooting
-
-### Addon loaded but panel is not visible
-
-- If solo, this is expected in auto mode.
-- Use `/wda show` to force it visible.
-- Verify the folder path and addon name in the AddOns menu.
-
-### Buttons do not trigger actions
-
-- Ensure you are in a group context where action is permitted.
-- Make sure you have a valid target for marker actions.
-- Test out of combat first.
-- If you updated files manually, run `/reload`.
-
-### Panel cannot be moved
-
-- Open Blizzard Edit Mode.
-- Drag the panel while Edit Mode is active.
-
-### Marker errors (`ADDON_ACTION_FORBIDDEN`)
-
-- This usually indicates an outdated/insecure code path.
-- Update to the latest version from this repository and `/reload`.
+- Workflow: `.github/workflows/release.yml`
+- Trigger: tags matching `v*`
+- Artifact: `WoW-Dungeon-Assist-vX.Y.Z.zip`
+- Zip layout: top-level `WoW-Dungeon-Assist/` addon folder
 
 ## Development Notes
 
-- Main code file: `WoW-Dungeon-Assist.lua`.
-- Entry event: `PLAYER_LOGIN`.
-- Visibility state driver: `"[group] show; hide"`.
-- Secure actions are configured once on frame creation; avoid non-secure calls for protected functions.
-- Edit Mode integration uses `EventRegistry` callbacks (`EditMode.Enter`, `EditMode.Exit`).
-- Release automation lives in `.github/workflows/release.yml` and packages zip assets from tags.
-- If updating for a new patch:
-  - Update `## Interface` in `WoW-Dungeon-Assist.toc`.
-  - Re-test secure actions (ready check, countdown, marker set/clear, clear-all).
+- Main addon logic: `WoW-Dungeon-Assist.lua`
+- TOC: `WoW-Dungeon-Assist.toc`
+- Keybind definitions: `Bindings.xml`
+- Preview image: `docs/dungeon-assist-panel.png`
+- Saved variable: `WoWDungeonAssistDB`
 
-## License
+When updating for a patch:
 
-No license file is currently included in this repository. Add one if you want explicit reuse terms.
+1. Bump `## Interface` in `WoW-Dungeon-Assist.toc` if needed.
+2. Re-test secure actions (ready check, countdown, marker set/clear, clear-all).
+3. Tag release (`vX.Y.Z`) to publish updated zip asset.
