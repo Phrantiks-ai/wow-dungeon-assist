@@ -35,7 +35,6 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 - Marker announce toggle (chat message on marker set).
 - Role-aware behavior:
   - Tank shortcut: optional right-click on ready button starts countdown.
-  - Healer compact mode: tighter panel layout for healers.
 - Mythic+ header widgets (optional, shown on the top bar):
   - Battle res status (`BR`).
   - Lust lockout status (`Lust Used` / `Lust Ready`).
@@ -45,7 +44,7 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 ## Game Version / API Notes
 
 - TOC Interface in this repo: `120001`.
-- Version in this repo: `1.3.1`.
+- Version in this repo: `1.3.2`.
 - Uses secure templates for protected actions:
   - `SecureHandlerStateTemplate` for visibility state driver.
   - `SecureActionButtonTemplate` for ready check/countdown/markers.
@@ -94,7 +93,6 @@ Settings available:
 - `Lock Mover In Edit Mode`
 - `Announce Marker Sets`
 - `Tank Shortcut (Ready RMB = Countdown)`
-- `Healer Compact Layout`
 - `Mythic+ Header Widgets`
 
 ## Slash Commands

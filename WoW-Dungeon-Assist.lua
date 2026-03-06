@@ -77,7 +77,6 @@ local defaults = {
 	countdownSeconds = 10,
 	announceMarkers = false,
 	tankShortcut = true,
-	healerCompactMode = false,
 	showMythicWidgets = true,
 	accentColorMode = "class",
 	customAccentColor = { r = 1, g = 0.82, b = 0 },
@@ -127,7 +126,7 @@ local themePresets = {
 local normalLayout = {
 	anchorWidth = 178,
 	dropdownWidth = 178,
-	dropdownHeight = 196,
+	dropdownHeight = 148,
 	clearWidth = 158,
 	clearHeight = 22,
 	clearTopOffset = -10,
@@ -144,28 +143,6 @@ local normalLayout = {
 	countdownRight = -14,
 	readyIconSize = 18,
 	countdownIconSize = 16,
-}
-
-local compactLayout = {
-	anchorWidth = 172,
-	dropdownWidth = 172,
-	dropdownHeight = 186,
-	clearWidth = 152,
-	clearHeight = 20,
-	clearTopOffset = -8,
-	markersLabelY = -40,
-	markerHolderY = -53,
-	markerSize = 22,
-	markerXSpacing = 28,
-	markerYSpacing = 26,
-	iconInset = 3,
-	actionWidth = 62,
-	actionHeight = 24,
-	buttonsBottom = 8,
-	readyLeft = 12,
-	countdownRight = -12,
-	readyIconSize = 16,
-	countdownIconSize = 14,
 }
 
 local backdropTemplate = {
@@ -604,13 +581,6 @@ local function SetupEditModeCallbacks()
 	end
 end
 
-local function GetActiveLayout()
-	if db.healerCompactMode and currentRole == "HEALER" then
-		return compactLayout
-	end
-	return normalLayout
-end
-
 local function ApplyAnchorScaleAndAlpha()
 	if not anchor then
 		return
@@ -796,8 +766,8 @@ local function CreateMarkerButton(parent, markerIndex)
 	icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. markerIndex)
 	button.icon = icon
 
-	button:HookScript("PostClick", function(self, mouseButton)
-		if mouseButton ~= "LeftButton" or self.isDisabled then
+	button:HookScript("OnClick", function(self, mouseButton, down)
+		if down or mouseButton ~= "LeftButton" or self.isDisabled then
 			return
 		end
 		AnnounceMarker(markerIndex)
@@ -811,7 +781,7 @@ local function ApplyLayout()
 		return
 	end
 
-	local layout = GetActiveLayout()
+	local layout = normalLayout
 
 	anchor:SetWidth(layout.anchorWidth)
 	dropdown:SetSize(layout.dropdownWidth, layout.dropdownHeight)
@@ -1711,13 +1681,6 @@ local function CreateOptionsPanel()
 	end)
 
 	y = y - 30
-	CreateToggleRow(optionsPanel, y, "Healer Compact Layout", function()
-		return db.healerCompactMode
-	end, function(value)
-		db.healerCompactMode = value
-	end)
-
-	y = y - 30
 	CreateToggleRow(optionsPanel, y, "Mythic+ Header Widgets", function()
 		return db.showMythicWidgets
 	end, function(value)
@@ -1740,7 +1703,6 @@ local function CreateOptionsPanel()
 		db.scale = defaults.scale
 		db.alpha = defaults.alpha
 		db.themePreset = defaults.themePreset
-		db.healerCompactMode = defaults.healerCompactMode
 		db.accentColorMode = defaults.accentColorMode
 		db.customAccentColor = DeepCopyTable(defaults.customAccentColor)
 		db.fontPreset = defaults.fontPreset
@@ -1756,7 +1718,7 @@ end
 
 local function CreateUI()
 	anchor = CreateFrame("Frame", "WoWDungeonAssistRaidControlAnchor", UIParent, "SecureHandlerStateTemplate")
-	anchor:SetSize(154, 24)
+	anchor:SetSize(normalLayout.anchorWidth, 24)
 	anchor:SetFrameStrata("MEDIUM")
 	anchor:SetMovable(true)
 	anchor:SetClampedToScreen(true)
@@ -1786,7 +1748,7 @@ local function CreateUI()
 
 	dropdown = CreateFrame("Frame", nil, anchor, "BackdropTemplate")
 	dropdown:SetPoint("TOP", anchor, "BOTTOM", 0, -2)
-	dropdown:SetSize(178, 196)
+	dropdown:SetSize(normalLayout.dropdownWidth, normalLayout.dropdownHeight)
 	dropdown:SetFrameStrata("MEDIUM")
 	SetBackdropStyle(dropdown, 10)
 	dropdown:SetBackdropColor(unpack(palette.panelBg))
@@ -1830,8 +1792,8 @@ local function CreateUI()
 	end
 
 	brStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	brStatusText:SetPoint("CENTER", headerButton, "CENTER", -24, 0)
-	brStatusText:SetWidth(50)
+	brStatusText:SetPoint("CENTER", headerButton, "CENTER", -18, 0)
+	brStatusText:SetWidth(44)
 	brStatusText:SetJustifyH("RIGHT")
 	brStatusText:SetText("BR --")
 	brStatusText:SetTextColor(unpack(palette.mutedText))
@@ -1840,8 +1802,8 @@ local function CreateUI()
 	brStatusText:SetShadowColor(0, 0, 0, 0.9)
 
 	lustStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	lustStatusText:SetPoint("LEFT", brStatusText, "RIGHT", 12, 0)
-	lustStatusText:SetWidth(72)
+	lustStatusText:SetPoint("LEFT", brStatusText, "RIGHT", 6, 0)
+	lustStatusText:SetWidth(62)
 	lustStatusText:SetJustifyH("LEFT")
 	lustStatusText:SetText("Lust --")
 	lustStatusText:SetTextColor(unpack(palette.mutedText))
