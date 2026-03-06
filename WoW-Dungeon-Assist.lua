@@ -75,7 +75,6 @@ local defaults = {
 	locked = false,
 	themePreset = "qui",
 	countdownSeconds = 10,
-	announceMarkers = false,
 	tankShortcut = true,
 	showMythicWidgets = true,
 	accentColorMode = "class",
@@ -145,6 +144,12 @@ local normalLayout = {
 	countdownIconSize = 16,
 }
 
+local HEADER_LEFT_PADDING = 12
+local HEADER_RIGHT_PADDING = 12
+local HEADER_ARROW_SPACE = 16
+local HEADER_CONTENT_GAP = 8
+local HEADER_MIN_WIDTH = 110
+
 local backdropTemplate = {
 	bgFile = "Interface\\Buttons\\WHITE8X8",
 	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -185,6 +190,7 @@ local fontOptionByID = {}
 local isEditMode = false
 local pendingVisibilityUpdate = false
 local pendingSecureUpdate = false
+local pendingHeaderSizeUpdate = false
 local currentRole = "NONE"
 local playerClassColor = { r = 1, g = 0.82, b = 0 }
 local classColor = { r = 1, g = 0.82, b = 0 }
@@ -717,40 +723,6 @@ local function CreateSecureActionButton(name, parent, label, width, height, poin
 	return button
 end
 
-local function GetGroupChatChannel()
-	if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
-		return "INSTANCE_CHAT"
-	end
-	if IsInRaid(LE_PARTY_CATEGORY_HOME) then
-		return "RAID"
-	end
-	if IsInGroup(LE_PARTY_CATEGORY_HOME) then
-		return "PARTY"
-	end
-	return nil
-end
-
-local function AnnounceMarker(markerIndex)
-	if not db.announceMarkers then
-		return
-	end
-
-	local channel = GetGroupChatChannel()
-	if not channel then
-		return
-	end
-	if not UnitExists("target") then
-		return
-	end
-
-	local targetName = UnitName("target")
-	if not targetName or targetName == "" then
-		return
-	end
-
-	SendChatMessage(string.format("{rt%d} %s", markerIndex, targetName), channel)
-end
-
 local function CreateMarkerButton(parent, markerIndex)
 	local button = CreateSecureActionButton(nil, parent, nil, 24, 24, "TOPLEFT", parent, "TOPLEFT", 0, 0)
 	button.markerIndex = markerIndex
@@ -766,14 +738,30 @@ local function CreateMarkerButton(parent, markerIndex)
 	icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. markerIndex)
 	button.icon = icon
 
-	button:HookScript("OnClick", function(self, mouseButton, down)
-		if down or mouseButton ~= "LeftButton" or self.isDisabled then
-			return
-		end
-		AnnounceMarker(markerIndex)
-	end)
-
 	return button
+end
+
+local function UpdateHeaderContentWidth()
+	if not anchor or not titleText or not brStatusText or not lustStatusText then
+		return
+	end
+
+	if InCombatLockdown() then
+		pendingHeaderSizeUpdate = true
+		return
+	end
+
+	pendingHeaderSizeUpdate = false
+
+	local contentWidth = 0
+	if db.showMythicWidgets then
+		contentWidth = math.ceil(brStatusText:GetStringWidth() + HEADER_CONTENT_GAP + lustStatusText:GetStringWidth())
+	else
+		contentWidth = math.ceil(titleText:GetStringWidth())
+	end
+
+	local targetWidth = math.max(HEADER_MIN_WIDTH, HEADER_LEFT_PADDING + contentWidth + HEADER_ARROW_SPACE + HEADER_RIGHT_PADDING)
+	anchor:SetWidth(targetWidth)
 end
 
 local function ApplyLayout()
@@ -783,7 +771,6 @@ local function ApplyLayout()
 
 	local layout = normalLayout
 
-	anchor:SetWidth(layout.anchorWidth)
 	dropdown:SetSize(layout.dropdownWidth, layout.dropdownHeight)
 
 	clearButton:ClearAllPoints()
@@ -1098,6 +1085,7 @@ local function UpdateMythicWidgets()
 		titleText:Show()
 		brStatusText:Hide()
 		lustStatusText:Hide()
+		UpdateHeaderContentWidth()
 		return
 	end
 
@@ -1111,6 +1099,7 @@ local function UpdateMythicWidgets()
 		brStatusText:SetTextColor(unpack(palette.mutedText))
 		lustStatusText:SetText("Lust --")
 		lustStatusText:SetTextColor(unpack(palette.mutedText))
+		UpdateHeaderContentWidth()
 		return
 	end
 
@@ -1134,6 +1123,8 @@ local function UpdateMythicWidgets()
 		lustStatusText:SetText("Lust Ready")
 		lustStatusText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	end
+
+	UpdateHeaderContentWidth()
 end
 
 local function RefreshOptionsPanelValues()
@@ -1244,16 +1235,12 @@ local function RegisterSlashCommands()
 			else
 				PrintMessage("Usage: /wda cd <seconds>")
 			end
-		elseif command == "announce" then
-			db.announceMarkers = not db.announceMarkers
-			ApplyConfiguredState()
-			PrintMessage("Marker announce " .. (db.announceMarkers and "enabled." or "disabled."))
 		elseif command == "lock" then
 			db.locked = not db.locked
 			ApplyConfiguredState()
 			PrintMessage("Panel lock " .. (db.locked and "enabled." or "disabled."))
 		else
-			PrintMessage("Commands: /wda config, /wda show, /wda auto, /wda mode, /wda cd, /wda lock, /wda announce, /wda reset, /wda where")
+			PrintMessage("Commands: /wda config, /wda show, /wda auto, /wda mode, /wda cd, /wda lock, /wda reset, /wda where")
 		end
 	end
 end
@@ -1667,13 +1654,6 @@ local function CreateOptionsPanel()
 	end)
 
 	y = y - 30
-	CreateToggleRow(optionsPanel, y, "Announce Marker Sets", function()
-		return db.announceMarkers
-	end, function(value)
-		db.announceMarkers = value
-	end)
-
-	y = y - 30
 	CreateToggleRow(optionsPanel, y, "Tank Shortcut (Ready RMB = Countdown)", function()
 		return db.tankShortcut
 	end, function(value)
@@ -1734,7 +1714,8 @@ local function CreateUI()
 	end)
 
 	titleText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	titleText:SetPoint("CENTER", -5, 0)
+	titleText:SetPoint("LEFT", headerButton, "LEFT", HEADER_LEFT_PADDING, 0)
+	titleText:SetJustifyH("LEFT")
 	titleText:SetText("Dungeon Assist")
 	titleText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	TrackFontString(titleText, 13)
@@ -1792,9 +1773,8 @@ local function CreateUI()
 	end
 
 	brStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	brStatusText:SetPoint("CENTER", headerButton, "CENTER", -18, 0)
-	brStatusText:SetWidth(44)
-	brStatusText:SetJustifyH("RIGHT")
+	brStatusText:SetPoint("LEFT", headerButton, "LEFT", HEADER_LEFT_PADDING, 0)
+	brStatusText:SetJustifyH("LEFT")
 	brStatusText:SetText("BR --")
 	brStatusText:SetTextColor(unpack(palette.mutedText))
 	TrackFontString(brStatusText, 11)
@@ -1802,8 +1782,7 @@ local function CreateUI()
 	brStatusText:SetShadowColor(0, 0, 0, 0.9)
 
 	lustStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	lustStatusText:SetPoint("LEFT", brStatusText, "RIGHT", 6, 0)
-	lustStatusText:SetWidth(62)
+	lustStatusText:SetPoint("LEFT", brStatusText, "RIGHT", HEADER_CONTENT_GAP, 0)
 	lustStatusText:SetJustifyH("LEFT")
 	lustStatusText:SetText("Lust --")
 	lustStatusText:SetTextColor(unpack(palette.mutedText))
@@ -1889,6 +1868,9 @@ addon:SetScript("OnEvent", function(_, event, ...)
 		end
 		if pendingSecureUpdate then
 			ApplySecureAttributesNow()
+		end
+		if pendingHeaderSizeUpdate then
+			UpdateHeaderContentWidth()
 		end
 	elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
 		UpdateActionAvailability()

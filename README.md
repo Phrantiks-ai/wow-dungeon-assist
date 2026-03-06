@@ -32,7 +32,6 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 - Permission-aware button states:
   - Buttons dim/disable when not allowed.
   - Tooltip shows the reason (for example missing permissions or target).
-- Marker announce toggle (chat message on marker set).
 - Role-aware behavior:
   - Tank shortcut: optional right-click on ready button starts countdown.
 - Mythic+ header widgets (optional, shown on the top bar):
@@ -44,7 +43,7 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 ## Game Version / API Notes
 
 - TOC Interface in this repo: `120001`.
-- Version in this repo: `1.3.2`.
+- Version in this repo: `1.3.3`.
 - Uses secure templates for protected actions:
   - `SecureHandlerStateTemplate` for visibility state driver.
   - `SecureActionButtonTemplate` for ready check/countdown/markers.
@@ -91,7 +90,6 @@ Settings available:
 - `Font`
 - `Default Countdown`
 - `Lock Mover In Edit Mode`
-- `Announce Marker Sets`
 - `Tank Shortcut (Ready RMB = Countdown)`
 - `Mythic+ Header Widgets`
 
@@ -109,7 +107,6 @@ Settings available:
 | `/wda mode hidden` | Visibility mode: Hidden. |
 | `/wda cd 10` | Sets default countdown seconds. |
 | `/wda countdown 10` | Alias of `/wda cd 10`. |
-| `/wda announce` | Toggles marker announce. |
 | `/wda lock` | Toggles mover lock while in Edit Mode. |
 | `/wda reset` | Resets saved panel position and forces Always Show mode. |
 | `/wda where` | Prints current saved anchor position. |
