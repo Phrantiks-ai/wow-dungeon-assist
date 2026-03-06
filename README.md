@@ -16,6 +16,11 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
   - `QUI Dark`
   - `Slate Steel`
   - `Ember`
+- Accent source options:
+  - `Class Color`
+  - `Custom Color` with color picker
+- Configurable dropdown direction (`Down` or `Up`).
+- Configurable font preset.
 - Action controls:
   - `Clear Markers` clears all raid target markers.
   - Eight target marker buttons.
@@ -30,7 +35,7 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 - Role-aware behavior:
   - Tank shortcut: optional right-click on ready button starts countdown.
   - Healer compact mode: tighter panel layout for healers.
-- Mythic+ footer widgets (optional):
+- Mythic+ header widgets (optional, shown on the top bar):
   - Battle res status (`BR`).
   - Lust lockout status (`Lust Used` / `Lust Ready`).
 - Keybinding support through `Bindings.xml`.
@@ -39,7 +44,7 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 ## Game Version / API Notes
 
 - TOC Interface in this repo: `120001`.
-- Version in this repo: `1.2.1`.
+- Version in this repo: `1.3.0`.
 - Uses secure templates for protected actions:
   - `SecureHandlerStateTemplate` for visibility state driver.
   - `SecureActionButtonTemplate` for ready check/countdown/markers.
@@ -80,12 +85,16 @@ Settings available:
 - `Panel Alpha`
 - `Visibility Mode`
 - `Theme Preset`
+- `Accent Source`
+- `Custom Accent Color`
+- `Dropdown Direction`
+- `Font Preset`
 - `Default Countdown`
 - `Lock Mover In Edit Mode`
 - `Announce Marker Sets`
 - `Tank Shortcut (Ready RMB = Countdown)`
 - `Healer Compact Layout`
-- `Mythic+ Footer Widgets`
+- `Mythic+ Header Widgets`
 
 ## Slash Commands
 
@@ -136,7 +145,7 @@ Combat notes:
 
 - Lust widget is based on common lust lockout debuffs across group members.
 - BR widget reads known battle-res spell charge state when available.
-- Outside active Mythic+, footer displays muted placeholder values.
+- Outside active Mythic+, header displays muted placeholder values.
 
 ## WoWUp / GitHub Release Setup
 

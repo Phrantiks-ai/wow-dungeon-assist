@@ -19,10 +19,34 @@ local SHOW_MODE_LABELS = {
 	[SHOW_MODE_HIDDEN] = "Hidden",
 }
 
+local ACCENT_SOURCE_LABELS = {
+	class = "Class Color",
+	custom = "Custom Color",
+}
+
+local DROPDOWN_DIRECTION_LABELS = {
+	down = "Down",
+	up = "Up",
+}
+
 local THEME_LABELS = {
 	qui = "QUI Dark",
 	slate = "Slate Steel",
 	ember = "Ember",
+}
+
+local FONT_PRESET_LABELS = {
+	frizqt = "Friz Quadrata",
+	arialn = "Arial Narrow",
+	morpheus = "Morpheus",
+	skurri = "Skurri",
+}
+
+local FONT_PRESET_PATHS = {
+	frizqt = "Fonts\\FRIZQT__.TTF",
+	arialn = "Fonts\\ARIALN.TTF",
+	morpheus = "Fonts\\MORPHEUS.ttf",
+	skurri = "Fonts\\skurri.ttf",
 }
 
 local MARKER_CONDITION_NAME = {
@@ -57,6 +81,10 @@ local defaults = {
 	tankShortcut = true,
 	healerCompactMode = false,
 	showMythicWidgets = true,
+	accentColorMode = "class",
+	customAccentColor = { r = 1, g = 0.82, b = 0 },
+	dropdownDirection = "down",
+	fontPreset = "frizqt",
 }
 
 local themePresets = {
@@ -99,7 +127,7 @@ local themePresets = {
 }
 
 local normalLayout = {
-	anchorWidth = 154,
+	anchorWidth = 178,
 	dropdownWidth = 178,
 	dropdownHeight = 196,
 	clearWidth = 158,
@@ -116,13 +144,12 @@ local normalLayout = {
 	buttonsBottom = 10,
 	readyLeft = 14,
 	countdownRight = -14,
-	widgetBottom = 44,
 	readyIconSize = 18,
 	countdownIconSize = 16,
 }
 
 local compactLayout = {
-	anchorWidth = 148,
+	anchorWidth = 172,
 	dropdownWidth = 172,
 	dropdownHeight = 186,
 	clearWidth = 152,
@@ -139,7 +166,6 @@ local compactLayout = {
 	buttonsBottom = 8,
 	readyLeft = 12,
 	countdownRight = -12,
-	widgetBottom = 40,
 	readyIconSize = 16,
 	countdownIconSize = 14,
 }
@@ -168,12 +194,13 @@ local dropdownShade
 local dropdownAccent
 local headerAccent
 local titleText
-local widgetsFrame
 local brStatusText
 local lustStatusText
 local optionsPanel
+local accentPickerButton
 local optionsRefreshers = {}
 local optionsAccentLabels = {}
+local trackedFontStrings = {}
 
 local markerButtons = {}
 local themedButtons = {}
@@ -182,6 +209,7 @@ local isEditMode = false
 local pendingVisibilityUpdate = false
 local pendingSecureUpdate = false
 local currentRole = "NONE"
+local playerClassColor = { r = 1, g = 0.82, b = 0 }
 local classColor = { r = 1, g = 0.82, b = 0 }
 local palette = themePresets.qui
 
@@ -203,7 +231,12 @@ function WoWDungeonAssist_TogglePanel()
 	dropdown:SetShown(not dropdown:IsShown())
 	db.expanded = dropdown:IsShown()
 	if arrowLabel then
-		arrowLabel:SetText(db.expanded and "^" or "v")
+		local isDownDirection = db.dropdownDirection ~= "up"
+		if dropdown:IsShown() then
+			arrowLabel:SetText(isDownDirection and "^" or "v")
+		else
+			arrowLabel:SetText(isDownDirection and "v" or "^")
+		end
 	end
 end
 
@@ -224,12 +257,51 @@ local function Round(value)
 	return math.ceil(value - 0.5)
 end
 
+local function DeepCopyTable(value)
+	if type(value) ~= "table" then
+		return value
+	end
+
+	local copy = {}
+	for key, nestedValue in pairs(value) do
+		copy[key] = DeepCopyTable(nestedValue)
+	end
+	return copy
+end
+
 local function CopyTheme(theme)
 	local copy = {}
 	for key, value in pairs(theme) do
 		copy[key] = { value[1], value[2], value[3], value[4] }
 	end
 	return copy
+end
+
+local function GetSelectedFontPath()
+	return FONT_PRESET_PATHS[db and db.fontPreset] or STANDARD_TEXT_FONT or FONT_PRESET_PATHS.frizqt
+end
+
+local function TrackFontString(fontString, size, flags)
+	if not fontString then
+		return
+	end
+
+	table.insert(trackedFontStrings, {
+		fontString = fontString,
+		size = size or 12,
+		flags = flags,
+	})
+end
+
+local function ApplyTrackedFonts()
+	local fontPath = GetSelectedFontPath()
+
+	for _, entry in ipairs(trackedFontStrings) do
+		local fontString = entry.fontString
+		if fontString and fontString.SetFont then
+			fontString:SetFont(fontPath, entry.size, entry.flags)
+		end
+	end
 end
 
 local function SetBackdropStyle(frame, edgeSize)
@@ -288,7 +360,23 @@ local function UpdateClassColor()
 	end
 
 	if color and color.r and color.g and color.b then
-		classColor = { r = color.r, g = color.g, b = color.b }
+		playerClassColor = { r = color.r, g = color.g, b = color.b }
+	end
+end
+
+local function RefreshAccentColorFromDB()
+	if db.accentColorMode == "custom" then
+		classColor = {
+			r = db.customAccentColor.r,
+			g = db.customAccentColor.g,
+			b = db.customAccentColor.b,
+		}
+	else
+		classColor = {
+			r = playerClassColor.r,
+			g = playerClassColor.g,
+			b = playerClassColor.b,
+		}
 	end
 end
 
@@ -304,19 +392,33 @@ local function EnsureDatabase()
 	db = _G[DB_NAME]
 	for key, value in pairs(defaults) do
 		if db[key] == nil then
-			db[key] = value
+			db[key] = DeepCopyTable(value)
+		elseif type(value) == "table" and type(db[key]) ~= "table" then
+			db[key] = DeepCopyTable(value)
 		end
 	end
 
 	db.scale = Clamp(tonumber(db.scale) or defaults.scale, 0.7, 1.4)
 	db.alpha = Clamp(tonumber(db.alpha) or defaults.alpha, 0.35, 1)
 	db.countdownSeconds = Clamp(math.floor(tonumber(db.countdownSeconds) or defaults.countdownSeconds), 3, 30)
+	db.customAccentColor.r = Clamp(tonumber(db.customAccentColor.r) or defaults.customAccentColor.r, 0, 1)
+	db.customAccentColor.g = Clamp(tonumber(db.customAccentColor.g) or defaults.customAccentColor.g, 0, 1)
+	db.customAccentColor.b = Clamp(tonumber(db.customAccentColor.b) or defaults.customAccentColor.b, 0, 1)
 
 	if not VISIBILITY_DRIVER_BY_MODE[db.showMode] then
 		db.showMode = defaults.showMode
 	end
 	if not themePresets[db.themePreset] then
 		db.themePreset = defaults.themePreset
+	end
+	if db.accentColorMode ~= "class" and db.accentColorMode ~= "custom" then
+		db.accentColorMode = defaults.accentColorMode
+	end
+	if db.dropdownDirection ~= "down" and db.dropdownDirection ~= "up" then
+		db.dropdownDirection = defaults.dropdownDirection
+	end
+	if not FONT_PRESET_PATHS[db.fontPreset] then
+		db.fontPreset = defaults.fontPreset
 	end
 end
 
@@ -346,7 +448,13 @@ local function UpdateArrow()
 	if not dropdown or not arrowLabel then
 		return
 	end
-	arrowLabel:SetText(dropdown:IsShown() and "^" or "v")
+
+	local isDownDirection = db.dropdownDirection ~= "up"
+	if dropdown:IsShown() then
+		arrowLabel:SetText(isDownDirection and "^" or "v")
+	else
+		arrowLabel:SetText(isDownDirection and "v" or "^")
+	end
 end
 
 local function ApplyExpandedState()
@@ -362,6 +470,19 @@ local function UpdateMoverVisibility()
 		return
 	end
 	moverOverlay:SetShown(isEditMode and not db.locked)
+end
+
+local function ApplyDropdownDirection()
+	if not dropdown or not anchor then
+		return
+	end
+
+	dropdown:ClearAllPoints()
+	if db.dropdownDirection == "up" then
+		dropdown:SetPoint("BOTTOM", anchor, "TOP", 0, 2)
+	else
+		dropdown:SetPoint("TOP", anchor, "BOTTOM", 0, -2)
+	end
 end
 
 local function ApplyVisibilityDriver()
@@ -546,6 +667,7 @@ local function CreateSecureActionButton(name, parent, label, width, height, poin
 		text:SetPoint("CENTER")
 		text:SetText(label)
 		text:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+		TrackFontString(text, 12)
 		text:SetShadowOffset(1, -1)
 		text:SetShadowColor(0, 0, 0, 0.9)
 		button.label = text
@@ -657,9 +779,6 @@ local function ApplyLayout()
 
 	readyIcon:SetSize(layout.readyIconSize, layout.readyIconSize)
 	countdownIcon:SetSize(layout.countdownIconSize, layout.countdownIconSize)
-
-	widgetsFrame:ClearAllPoints()
-	widgetsFrame:SetPoint("BOTTOM", dropdown, "BOTTOM", 0, layout.widgetBottom)
 end
 
 local function ApplyTheme()
@@ -682,6 +801,8 @@ local function ApplyTheme()
 
 	titleText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	arrowLabel:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	brStatusText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	lustStatusText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	markersLabel:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	countdownText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 
@@ -930,16 +1051,20 @@ local function GetBattleResCharges()
 end
 
 local function UpdateMythicWidgets()
-	if not widgetsFrame then
+	if not brStatusText or not lustStatusText or not titleText then
 		return
 	end
 
 	if not db.showMythicWidgets then
-		widgetsFrame:Hide()
+		titleText:Show()
+		brStatusText:Hide()
+		lustStatusText:Hide()
 		return
 	end
 
-	widgetsFrame:Show()
+	titleText:Hide()
+	brStatusText:Show()
+	lustStatusText:Show()
 
 	local challengeActive = C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive and C_ChallengeMode.IsChallengeModeActive()
 	if not challengeActive then
@@ -984,8 +1109,12 @@ end
 
 local function ApplyConfiguredState()
 	currentRole = GetAssignedRole()
+	RefreshAccentColorFromDB()
 	RefreshPaletteFromDB()
+	ApplyDropdownDirection()
+	UpdateArrow()
 	ApplyLayout()
+	ApplyTrackedFonts()
 	ApplyTheme()
 	ApplyAnchorScaleAndAlpha()
 	UpdateMoverVisibility()
@@ -1105,8 +1234,9 @@ local function AddOptionsRefresher(func)
 	table.insert(optionsRefreshers, func)
 end
 
-local function AddOptionsLabel(label)
+local function AddOptionsLabel(label, size, flags)
 	table.insert(optionsAccentLabels, label)
+	TrackFontString(label, size or 12, flags)
 end
 
 local function CreateOptionsValueText(parent, x, y)
@@ -1115,7 +1245,7 @@ local function CreateOptionsValueText(parent, x, y)
 	text:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	text:SetShadowOffset(1, -1)
 	text:SetShadowColor(0, 0, 0, 0.9)
-	AddOptionsLabel(text)
+	AddOptionsLabel(text, 12)
 	return text
 end
 
@@ -1132,7 +1262,7 @@ local function CreateNumericRow(parent, y, labelText, getter, setter, step, minV
 	label:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	label:SetShadowOffset(1, -1)
 	label:SetShadowColor(0, 0, 0, 0.9)
-	AddOptionsLabel(label)
+	AddOptionsLabel(label, 12)
 
 	local minus = CreateOptionsButton(parent, 24, 20)
 	minus:SetPoint("TOPLEFT", 260, y + 2)
@@ -1171,7 +1301,7 @@ local function CreateCycleRow(parent, y, labelText, values, getter, setter, form
 	label:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	label:SetShadowOffset(1, -1)
 	label:SetShadowColor(0, 0, 0, 0.9)
-	AddOptionsLabel(label)
+	AddOptionsLabel(label, 12)
 
 	local button = CreateOptionsButton(parent, 142, 20)
 	button:SetPoint("TOPLEFT", 260, y + 2)
@@ -1223,7 +1353,7 @@ local function CreateToggleRow(parent, y, labelText, getter, setter)
 	label:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	label:SetShadowOffset(1, -1)
 	label:SetShadowColor(0, 0, 0, 0.9)
-	AddOptionsLabel(label)
+	AddOptionsLabel(label, 12)
 
 	local button = CreateOptionsButton(parent, 142, 20)
 	button:SetPoint("TOPLEFT", 260, y + 2)
@@ -1237,6 +1367,70 @@ local function CreateToggleRow(parent, y, labelText, getter, setter)
 	end)
 end
 
+local function BuildColorHexText(color)
+	local r = Clamp(math.floor((color.r or 1) * 255 + 0.5), 0, 255)
+	local g = Clamp(math.floor((color.g or 1) * 255 + 0.5), 0, 255)
+	local b = Clamp(math.floor((color.b or 1) * 255 + 0.5), 0, 255)
+	return string.format("#%02X%02X%02X", r, g, b)
+end
+
+local function OpenAccentColorPicker()
+	if not ColorPickerFrame or not db then
+		return
+	end
+
+	local startColor = {
+		r = db.customAccentColor.r,
+		g = db.customAccentColor.g,
+		b = db.customAccentColor.b,
+	}
+
+	local function applyColor(r, g, b)
+		db.customAccentColor.r = Clamp(r or startColor.r, 0, 1)
+		db.customAccentColor.g = Clamp(g or startColor.g, 0, 1)
+		db.customAccentColor.b = Clamp(b or startColor.b, 0, 1)
+		db.accentColorMode = "custom"
+		ApplyConfiguredState()
+	end
+
+	if ColorPickerFrame.SetupColorPickerAndShow then
+		local info = {}
+		info.r = startColor.r
+		info.g = startColor.g
+		info.b = startColor.b
+		info.hasOpacity = false
+		info.previousValues = startColor
+		info.swatchFunc = function()
+			local r, g, b = ColorPickerFrame:GetColorRGB()
+			applyColor(r, g, b)
+		end
+		info.cancelFunc = function(previousValues)
+			local previousR = previousValues and (previousValues.r or previousValues[1]) or startColor.r
+			local previousG = previousValues and (previousValues.g or previousValues[2]) or startColor.g
+			local previousB = previousValues and (previousValues.b or previousValues[3]) or startColor.b
+			applyColor(previousR, previousG, previousB)
+		end
+		ColorPickerFrame:SetupColorPickerAndShow(info)
+		return
+	end
+
+	ColorPickerFrame.hasOpacity = false
+	ColorPickerFrame.previousValues = startColor
+	ColorPickerFrame:SetColorRGB(startColor.r, startColor.g, startColor.b)
+	ColorPickerFrame.func = function()
+		local r, g, b = ColorPickerFrame:GetColorRGB()
+		applyColor(r, g, b)
+	end
+	ColorPickerFrame.cancelFunc = function(previousValues)
+		local previousR = previousValues and (previousValues.r or previousValues[1]) or startColor.r
+		local previousG = previousValues and (previousValues.g or previousValues[2]) or startColor.g
+		local previousB = previousValues and (previousValues.b or previousValues[3]) or startColor.b
+		applyColor(previousR, previousG, previousB)
+	end
+	ColorPickerFrame:Hide()
+	ColorPickerFrame:Show()
+end
+
 local function CreateOptionsPanel()
 	optionsPanel = CreateFrame("Frame", "WoWDungeonAssistOptionsPanel", UIParent)
 	optionsPanel.name = "WoW Dungeon Assist"
@@ -1247,12 +1441,13 @@ local function CreateOptionsPanel()
 	title:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	title:SetShadowOffset(1, -1)
 	title:SetShadowColor(0, 0, 0, 0.9)
-	AddOptionsLabel(title)
+	AddOptionsLabel(title, 16)
 
 	local subtitle = optionsPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	subtitle:SetPoint("TOPLEFT", 16, -40)
 	subtitle:SetText("Control panel behavior, style, countdown defaults, and role-aware helpers.")
 	subtitle:SetTextColor(unpack(palette.mutedText))
+	TrackFontString(subtitle, 11)
 
 	local y = -78
 	CreateNumericRow(optionsPanel, y, "Panel Scale", function()
@@ -1291,6 +1486,58 @@ local function CreateOptionsPanel()
 	end)
 
 	y = y - 30
+	CreateCycleRow(optionsPanel, y, "Accent Source", { "class", "custom" }, function()
+		return db.accentColorMode
+	end, function(value)
+		db.accentColorMode = value
+	end, function(value)
+		return ACCENT_SOURCE_LABELS[value] or value
+	end)
+
+	y = y - 30
+	local accentLabel = optionsPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	accentLabel:SetPoint("TOPLEFT", 22, y)
+	accentLabel:SetText("Custom Accent Color")
+	accentLabel:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	accentLabel:SetShadowOffset(1, -1)
+	accentLabel:SetShadowColor(0, 0, 0, 0.9)
+	AddOptionsLabel(accentLabel, 12)
+
+	accentPickerButton = CreateOptionsButton(optionsPanel, 142, 20)
+	accentPickerButton:SetPoint("TOPLEFT", 260, y + 2)
+	accentPickerButton:SetScript("OnClick", function()
+		OpenAccentColorPicker()
+	end)
+
+	AddOptionsRefresher(function()
+		if db.accentColorMode == "custom" then
+			accentPickerButton:Enable()
+			accentPickerButton:SetText("Pick " .. BuildColorHexText(db.customAccentColor))
+		else
+			accentPickerButton:Disable()
+			accentPickerButton:SetText("Class Color")
+		end
+	end)
+
+	y = y - 30
+	CreateCycleRow(optionsPanel, y, "Dropdown Direction", { "down", "up" }, function()
+		return db.dropdownDirection
+	end, function(value)
+		db.dropdownDirection = value
+	end, function(value)
+		return DROPDOWN_DIRECTION_LABELS[value] or value
+	end)
+
+	y = y - 30
+	CreateCycleRow(optionsPanel, y, "Font Preset", { "frizqt", "arialn", "morpheus", "skurri" }, function()
+		return db.fontPreset
+	end, function(value)
+		db.fontPreset = value
+	end, function(value)
+		return FONT_PRESET_LABELS[value] or value
+	end)
+
+	y = y - 30
 	CreateCycleRow(optionsPanel, y, "Default Countdown", COUNTDOWN_PRESETS, function()
 		return db.countdownSeconds
 	end, function(value)
@@ -1306,7 +1553,7 @@ local function CreateOptionsPanel()
 	behaviorHeader:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 	behaviorHeader:SetShadowOffset(1, -1)
 	behaviorHeader:SetShadowColor(0, 0, 0, 0.9)
-	AddOptionsLabel(behaviorHeader)
+	AddOptionsLabel(behaviorHeader, 13)
 
 	y = y - 28
 	CreateToggleRow(optionsPanel, y, "Lock Mover In Edit Mode", function()
@@ -1337,7 +1584,7 @@ local function CreateOptionsPanel()
 	end)
 
 	y = y - 30
-	CreateToggleRow(optionsPanel, y, "Mythic+ Footer Widgets", function()
+	CreateToggleRow(optionsPanel, y, "Mythic+ Header Widgets", function()
 		return db.showMythicWidgets
 	end, function(value)
 		db.showMythicWidgets = value
@@ -1360,6 +1607,10 @@ local function CreateOptionsPanel()
 		db.alpha = defaults.alpha
 		db.themePreset = defaults.themePreset
 		db.healerCompactMode = defaults.healerCompactMode
+		db.accentColorMode = defaults.accentColorMode
+		db.customAccentColor = DeepCopyTable(defaults.customAccentColor)
+		db.fontPreset = defaults.fontPreset
+		db.dropdownDirection = defaults.dropdownDirection
 		ApplyConfiguredState()
 		PrintMessage("Visual settings reset.")
 	end)
@@ -1390,12 +1641,14 @@ local function CreateUI()
 	titleText:SetPoint("CENTER", -5, 0)
 	titleText:SetText("Dungeon Assist")
 	titleText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	TrackFontString(titleText, 13)
 	titleText:SetShadowOffset(1, -1)
 	titleText:SetShadowColor(0, 0, 0, 0.9)
 
 	arrowLabel = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	arrowLabel:SetPoint("RIGHT", -8, 0)
 	arrowLabel:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	TrackFontString(arrowLabel, 11)
 
 	dropdown = CreateFrame("Frame", nil, anchor, "BackdropTemplate")
 	dropdown:SetPoint("TOP", anchor, "BOTTOM", 0, -2)
@@ -1428,6 +1681,7 @@ local function CreateUI()
 	markersLabel:SetPoint("TOPLEFT", 12, -44)
 	markersLabel:SetText("Target Markers")
 	markersLabel:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	TrackFontString(markersLabel, 11)
 
 	markerHolder = CreateFrame("Frame", nil, dropdown)
 	markerHolder:SetPoint("TOPLEFT", 11, -58)
@@ -1441,21 +1695,23 @@ local function CreateUI()
 		table.insert(markerButtons, button)
 	end
 
-	widgetsFrame = CreateFrame("Frame", nil, dropdown)
-	widgetsFrame:SetSize(150, 14)
-	widgetsFrame:SetPoint("BOTTOM", dropdown, "BOTTOM", 0, 44)
-
-	brStatusText = widgetsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	brStatusText:SetPoint("LEFT", widgetsFrame, "LEFT", 0, 0)
+	brStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	brStatusText:SetPoint("LEFT", headerButton, "LEFT", 10, 0)
+	brStatusText:SetWidth(66)
+	brStatusText:SetJustifyH("LEFT")
 	brStatusText:SetText("BR --")
 	brStatusText:SetTextColor(unpack(palette.mutedText))
+	TrackFontString(brStatusText, 11)
 	brStatusText:SetShadowOffset(1, -1)
 	brStatusText:SetShadowColor(0, 0, 0, 0.9)
 
-	lustStatusText = widgetsFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	lustStatusText:SetPoint("RIGHT", widgetsFrame, "RIGHT", 0, 0)
+	lustStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	lustStatusText:SetPoint("RIGHT", arrowLabel, "LEFT", -8, 0)
+	lustStatusText:SetWidth(86)
+	lustStatusText:SetJustifyH("RIGHT")
 	lustStatusText:SetText("Lust --")
 	lustStatusText:SetTextColor(unpack(palette.mutedText))
+	TrackFontString(lustStatusText, 11)
 	lustStatusText:SetShadowOffset(1, -1)
 	lustStatusText:SetShadowColor(0, 0, 0, 0.9)
 
@@ -1484,6 +1740,7 @@ local function CreateUI()
 	countdownText:SetPoint("LEFT", countdownIcon, "RIGHT", 4, 0)
 	countdownText:SetText("10")
 	countdownText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	TrackFontString(countdownText, 12)
 	countdownText:SetShadowOffset(1, -1)
 	countdownText:SetShadowColor(0, 0, 0, 0.9)
 
@@ -1509,6 +1766,7 @@ local function CreateUI()
 	moverText:SetPoint("CENTER")
 	moverText:SetText("Drag to move")
 	moverText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	TrackFontString(moverText, 12)
 	moverText:SetShadowOffset(1, -1)
 	moverText:SetShadowColor(0, 0, 0, 0.9)
 	moverOverlay:Hide()
