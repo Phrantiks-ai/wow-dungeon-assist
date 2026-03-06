@@ -19,8 +19,9 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 - Accent source options:
   - `Class Color`
   - `Custom Color` with color picker
+- Accent source uses a dropdown selector.
 - Configurable dropdown direction (`Down` or `Up`).
-- Configurable font preset.
+- Font uses a dropdown selector (built-in WoW fonts + LibSharedMedia fonts when available).
 - Action controls:
   - `Clear Markers` clears all raid target markers.
   - Eight target marker buttons.
@@ -44,7 +45,7 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 ## Game Version / API Notes
 
 - TOC Interface in this repo: `120001`.
-- Version in this repo: `1.3.0`.
+- Version in this repo: `1.3.1`.
 - Uses secure templates for protected actions:
   - `SecureHandlerStateTemplate` for visibility state driver.
   - `SecureActionButtonTemplate` for ready check/countdown/markers.
@@ -88,7 +89,7 @@ Settings available:
 - `Accent Source`
 - `Custom Accent Color`
 - `Dropdown Direction`
-- `Font Preset`
+- `Font`
 - `Default Countdown`
 - `Lock Mover In Edit Mode`
 - `Announce Marker Sets`

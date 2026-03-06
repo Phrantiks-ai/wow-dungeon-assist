@@ -35,18 +35,16 @@ local THEME_LABELS = {
 	ember = "Ember",
 }
 
-local FONT_PRESET_LABELS = {
-	frizqt = "Friz Quadrata",
-	arialn = "Arial Narrow",
-	morpheus = "Morpheus",
-	skurri = "Skurri",
-}
-
-local FONT_PRESET_PATHS = {
-	frizqt = "Fonts\\FRIZQT__.TTF",
-	arialn = "Fonts\\ARIALN.TTF",
-	morpheus = "Fonts\\MORPHEUS.ttf",
-	skurri = "Fonts\\skurri.ttf",
+local BUILTIN_FONT_ENTRIES = {
+	{ id = "frizqt", label = "Friz Quadrata", path = "Fonts\\FRIZQT__.TTF" },
+	{ id = "arialn", label = "Arial Narrow", path = "Fonts\\ARIALN.TTF" },
+	{ id = "arialnb", label = "Arial Narrow Bold", path = "Fonts\\ARIALNB.TTF" },
+	{ id = "arialni", label = "Arial Narrow Italic", path = "Fonts\\ARIALNI.TTF" },
+	{ id = "arialnbi", label = "Arial Narrow Bold Italic", path = "Fonts\\ARIALNBI.TTF" },
+	{ id = "morpheus", label = "Morpheus", path = "Fonts\\MORPHEUS.ttf" },
+	{ id = "skurri", label = "Skurri", path = "Fonts\\skurri.ttf" },
+	{ id = "blei", label = "Blei", path = "Fonts\\blei00d.TTF" },
+	{ id = "quest", label = "Quest", path = "Fonts\\2002.TTF" },
 }
 
 local MARKER_CONDITION_NAME = {
@@ -204,6 +202,8 @@ local trackedFontStrings = {}
 
 local markerButtons = {}
 local themedButtons = {}
+local fontOptions = {}
+local fontOptionByID = {}
 
 local isEditMode = false
 local pendingVisibilityUpdate = false
@@ -277,8 +277,75 @@ local function CopyTheme(theme)
 	return copy
 end
 
+local function AddFontOption(id, label, path)
+	if not id or id == "" or not path or path == "" then
+		return
+	end
+	if fontOptionByID[id] then
+		return
+	end
+
+	local entry = {
+		id = id,
+		label = label or id,
+		path = path,
+	}
+	fontOptionByID[id] = entry
+	table.insert(fontOptions, entry)
+end
+
+local function BuildFontOptions()
+	fontOptions = {}
+	fontOptionByID = {}
+
+	for _, entry in ipairs(BUILTIN_FONT_ENTRIES) do
+		AddFontOption(entry.id, entry.label, entry.path)
+	end
+
+	if STANDARD_TEXT_FONT then
+		AddFontOption("std", "Standard UI", STANDARD_TEXT_FONT)
+	end
+	if UNIT_NAME_FONT then
+		AddFontOption("unit", "Unit Name", UNIT_NAME_FONT)
+	end
+	if DAMAGE_TEXT_FONT then
+		AddFontOption("damage", "Damage Text", DAMAGE_TEXT_FONT)
+	end
+	if NAMEPLATE_FONT then
+		AddFontOption("nameplate", "Nameplate", NAMEPLATE_FONT)
+	end
+
+	if LibStub then
+		local lsm = LibStub("LibSharedMedia-3.0", true)
+		if lsm and lsm.List and lsm.Fetch then
+			local names = lsm:List("font")
+			if names then
+				for _, name in ipairs(names) do
+					local path = lsm:Fetch("font", name, true)
+					if path then
+						AddFontOption("lsm:" .. name, name, path)
+					end
+				end
+			end
+		end
+	end
+
+	table.sort(fontOptions, function(a, b)
+		return a.label:lower() < b.label:lower()
+	end)
+end
+
 local function GetSelectedFontPath()
-	return FONT_PRESET_PATHS[db and db.fontPreset] or STANDARD_TEXT_FONT or FONT_PRESET_PATHS.frizqt
+	if db and db.fontPreset and fontOptionByID[db.fontPreset] then
+		return fontOptionByID[db.fontPreset].path
+	end
+	if fontOptionByID[defaults.fontPreset] then
+		return fontOptionByID[defaults.fontPreset].path
+	end
+	if STANDARD_TEXT_FONT then
+		return STANDARD_TEXT_FONT
+	end
+	return "Fonts\\FRIZQT__.TTF"
 end
 
 local function TrackFontString(fontString, size, flags)
@@ -385,6 +452,8 @@ local function RefreshPaletteFromDB()
 end
 
 local function EnsureDatabase()
+	BuildFontOptions()
+
 	if type(_G[DB_NAME]) ~= "table" then
 		_G[DB_NAME] = {}
 	end
@@ -417,7 +486,7 @@ local function EnsureDatabase()
 	if db.dropdownDirection ~= "down" and db.dropdownDirection ~= "up" then
 		db.dropdownDirection = defaults.dropdownDirection
 	end
-	if not FONT_PRESET_PATHS[db.fontPreset] then
+	if not fontOptionByID[db.fontPreset] then
 		db.fontPreset = defaults.fontPreset
 	end
 end
@@ -1109,6 +1178,10 @@ end
 
 local function ApplyConfiguredState()
 	currentRole = GetAssignedRole()
+	BuildFontOptions()
+	if not fontOptionByID[db.fontPreset] then
+		db.fontPreset = defaults.fontPreset
+	end
 	RefreshAccentColorFromDB()
 	RefreshPaletteFromDB()
 	ApplyDropdownDirection()
@@ -1346,6 +1419,57 @@ local function CreateCycleRow(parent, y, labelText, values, getter, setter, form
 	end)
 end
 
+local function CreateDropdownRow(parent, y, labelText, width, getItems, getter, setter)
+	local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	label:SetPoint("TOPLEFT", 22, y)
+	label:SetText(labelText)
+	label:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	label:SetShadowOffset(1, -1)
+	label:SetShadowColor(0, 0, 0, 0.9)
+	AddOptionsLabel(label, 12)
+
+	local dropdownFrame = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
+	dropdownFrame:SetPoint("TOPLEFT", 232, y + 14)
+	UIDropDownMenu_SetWidth(dropdownFrame, width or 170)
+
+	local function initialize(_, level)
+		if level ~= 1 then
+			return
+		end
+
+		for _, item in ipairs(getItems()) do
+			local value = item.value
+			local text = item.label
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = text
+			info.value = value
+			info.checked = (getter() == value)
+			info.func = function()
+				setter(value)
+				ApplyConfiguredState()
+			end
+			UIDropDownMenu_AddButton(info, level)
+		end
+	end
+
+	local function refresh()
+		UIDropDownMenu_Initialize(dropdownFrame, initialize)
+
+		local selected = getter()
+		local selectedLabel = nil
+		for _, item in ipairs(getItems()) do
+			if item.value == selected then
+				selectedLabel = item.label
+				break
+			end
+		end
+		UIDropDownMenu_SetText(dropdownFrame, selectedLabel or tostring(selected))
+	end
+
+	AddOptionsRefresher(refresh)
+	return dropdownFrame
+end
+
 local function CreateToggleRow(parent, y, labelText, getter, setter)
 	local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	label:SetPoint("TOPLEFT", 22, y)
@@ -1486,12 +1610,15 @@ local function CreateOptionsPanel()
 	end)
 
 	y = y - 30
-	CreateCycleRow(optionsPanel, y, "Accent Source", { "class", "custom" }, function()
+	CreateDropdownRow(optionsPanel, y, "Accent Source", 170, function()
+		return {
+			{ value = "class", label = ACCENT_SOURCE_LABELS.class },
+			{ value = "custom", label = ACCENT_SOURCE_LABELS.custom },
+		}
+	end, function()
 		return db.accentColorMode
 	end, function(value)
 		db.accentColorMode = value
-	end, function(value)
-		return ACCENT_SOURCE_LABELS[value] or value
 	end)
 
 	y = y - 30
@@ -1529,12 +1656,19 @@ local function CreateOptionsPanel()
 	end)
 
 	y = y - 30
-	CreateCycleRow(optionsPanel, y, "Font Preset", { "frizqt", "arialn", "morpheus", "skurri" }, function()
+	CreateDropdownRow(optionsPanel, y, "Font", 220, function()
+		local items = {}
+		for _, fontEntry in ipairs(fontOptions) do
+			items[#items + 1] = {
+				value = fontEntry.id,
+				label = fontEntry.label,
+			}
+		end
+		return items
+	end, function()
 		return db.fontPreset
 	end, function(value)
 		db.fontPreset = value
-	end, function(value)
-		return FONT_PRESET_LABELS[value] or value
 	end)
 
 	y = y - 30
@@ -1696,9 +1830,9 @@ local function CreateUI()
 	end
 
 	brStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	brStatusText:SetPoint("LEFT", headerButton, "LEFT", 10, 0)
-	brStatusText:SetWidth(66)
-	brStatusText:SetJustifyH("LEFT")
+	brStatusText:SetPoint("CENTER", headerButton, "CENTER", -24, 0)
+	brStatusText:SetWidth(50)
+	brStatusText:SetJustifyH("RIGHT")
 	brStatusText:SetText("BR --")
 	brStatusText:SetTextColor(unpack(palette.mutedText))
 	TrackFontString(brStatusText, 11)
@@ -1706,9 +1840,9 @@ local function CreateUI()
 	brStatusText:SetShadowColor(0, 0, 0, 0.9)
 
 	lustStatusText = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	lustStatusText:SetPoint("RIGHT", arrowLabel, "LEFT", -8, 0)
-	lustStatusText:SetWidth(86)
-	lustStatusText:SetJustifyH("RIGHT")
+	lustStatusText:SetPoint("LEFT", brStatusText, "RIGHT", 12, 0)
+	lustStatusText:SetWidth(72)
+	lustStatusText:SetJustifyH("LEFT")
 	lustStatusText:SetText("Lust --")
 	lustStatusText:SetTextColor(unpack(palette.mutedText))
 	TrackFontString(lustStatusText, 11)
