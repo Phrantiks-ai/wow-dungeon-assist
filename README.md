@@ -10,6 +10,10 @@ A lightweight World of Warcraft addon that provides a compact, ElvUI-style raid 
 - Auto-visibility when grouped (`party` or `raid`), hidden when solo.
 - Movable in Blizzard Edit Mode.
 - Class-colored title/text/icons.
+- QUI-inspired dark theming pass:
+  - Cleaner spacing and panel sizing.
+  - Consistent dark surface/border treatment.
+  - Class-accent hover highlights for action buttons and header.
 - Secure action buttons for:
   - `Ready Check` (checkmark icon).
   - `Countdown 10` (clock icon + `10`).
@@ -39,6 +43,26 @@ A lightweight World of Warcraft addon that provides a compact, ElvUI-style raid 
    - `WoW-Dungeon-Assist.lua`
 4. Launch the game and enable `WoW Dungeon Assist` in AddOns.
 5. Run `/reload` after updates.
+
+## WoWUp / GitHub Release Setup
+
+This repo is configured to produce WoWUp-friendly GitHub releases, similar to QUI.
+
+- Workflow file: `.github/workflows/release.yml`
+- Trigger: pushing a tag matching `v*` (example: `v1.0.1`)
+- Output artifact: `WoW-Dungeon-Assist-vX.Y.Z.zip`
+- Zip structure: contains a top-level `WoW-Dungeon-Assist/` addon folder
+- Preview image for clients that support it: `.previews/panel.png`
+
+Release steps:
+
+1. Update addon code and (if needed) bump `## Version` in `WoW-Dungeon-Assist.toc`.
+2. Commit and push `main`.
+3. Create and push a version tag:
+   - `git tag v1.0.1`
+   - `git push origin v1.0.1`
+4. Wait for GitHub Actions to publish the release zip.
+5. Install/update from the GitHub release in WoWUp.
 
 ## Usage
 
@@ -120,6 +144,7 @@ Stored keys:
 - Visibility state driver: `"[group] show; hide"`.
 - Secure actions are configured once on frame creation; avoid non-secure calls for protected functions.
 - Edit Mode integration uses `EventRegistry` callbacks (`EditMode.Enter`, `EditMode.Exit`).
+- Release automation lives in `.github/workflows/release.yml` and packages zip assets from tags.
 - If updating for a new patch:
   - Update `## Interface` in `WoW-Dungeon-Assist.toc`.
   - Re-test secure actions (ready check, countdown, marker set/clear, clear-all).

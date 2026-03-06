@@ -1,4 +1,5 @@
 local addon = CreateFrame("Frame")
+local unpack = unpack or table.unpack
 
 local DB_NAME = "WoWDungeonAssistDB"
 local VISIBILITY_DRIVER = "[group] show; hide"
@@ -21,6 +22,23 @@ local isEditMode = false
 local forcedShow = false
 local pendingVisibilityUpdate = false
 local classColor = { r = 1, g = 0.82, b = 0 }
+local palette = {
+	panelBg = { 0.03, 0.035, 0.045, 0.96 },
+	panelBorder = { 0.19, 0.22, 0.26, 1 },
+	headerBg = { 0.055, 0.06, 0.075, 0.94 },
+	headerHover = { 0.085, 0.095, 0.12, 0.98 },
+	buttonBg = { 0.025, 0.03, 0.04, 0.95 },
+	buttonHover = { 0.07, 0.08, 0.105, 0.95 },
+	buttonBorder = { 0.19, 0.22, 0.26, 1 },
+	mutedText = { 0.72, 0.74, 0.78, 1 },
+	moverBg = { 0.12, 0.35, 0.6, 0.45 },
+	moverBorder = { 0.25, 0.65, 1, 1 },
+}
+local backdropTemplate = {
+	bgFile = "Interface\\Buttons\\WHITE8X8",
+	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	insets = { left = 2, right = 2, top = 2, bottom = 2 },
+}
 local markerConditionName = {
 	[8] = "skull",
 	[7] = "cross",
@@ -90,6 +108,23 @@ local function UpdateClassColor()
 	if color and color.r and color.g and color.b then
 		classColor = { r = color.r, g = color.g, b = color.b }
 	end
+end
+
+local function SetBackdropStyle(frame, edgeSize)
+	frame:SetBackdrop({
+		bgFile = backdropTemplate.bgFile,
+		edgeFile = backdropTemplate.edgeFile,
+		edgeSize = edgeSize or 8,
+		insets = backdropTemplate.insets,
+	})
+end
+
+local function SetClassAccentBorder(frame, alpha, brightness)
+	local boost = brightness or 0.85
+	local r = math.min(classColor.r * boost + 0.1, 1)
+	local g = math.min(classColor.g * boost + 0.1, 1)
+	local b = math.min(classColor.b * boost + 0.1, 1)
+	frame:SetBackdropBorderColor(r, g, b, alpha or 1)
 end
 
 local function UpdateArrow()
@@ -188,26 +223,26 @@ local function CreateSecureActionButton(parent, label, width, height, point, rel
 	button:SetSize(width, height)
 	button:SetPoint(point, relativeTo, relativePoint, x, y)
 	button:RegisterForClicks("AnyDown", "AnyUp")
-	button:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		edgeSize = 8,
-		insets = { left = 2, right = 2, top = 2, bottom = 2 },
-	})
-	button:SetBackdropColor(0.02, 0.02, 0.02, 0.95)
-	button:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
-	button:SetScript("OnEnter", function()
-		button:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+	SetBackdropStyle(button, 8)
+	button:SetBackdropColor(unpack(palette.buttonBg))
+	button:SetBackdropBorderColor(unpack(palette.buttonBorder))
+	button:HookScript("OnEnter", function(self)
+		self:SetBackdropColor(unpack(palette.buttonHover))
+		SetClassAccentBorder(self, 0.95, 0.8)
 	end)
-	button:SetScript("OnLeave", function()
-		button:SetBackdropColor(0.02, 0.02, 0.02, 0.95)
+	button:HookScript("OnLeave", function(self)
+		self:SetBackdropColor(unpack(palette.buttonBg))
+		self:SetBackdropBorderColor(unpack(palette.buttonBorder))
 	end)
 
 	if label and label ~= "" then
-		local text = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		local text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 		text:SetPoint("CENTER")
 		text:SetText(label)
 		text:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+		text:SetShadowOffset(1, -1)
+		text:SetShadowColor(0, 0, 0, 0.9)
+		button.label = text
 	end
 
 	return button
@@ -224,19 +259,19 @@ local function CreateMarkerButton(parent, markerIndex, point, relativeTo, relati
 	button:SetAttribute("macrotext2", "/tm [@target,exists,raidtarget:" .. markerName .. "] 0")
 
 	local icon = button:CreateTexture(nil, "ARTWORK")
-	icon:SetPoint("TOPLEFT", 2, -2)
-	icon:SetPoint("BOTTOMRIGHT", -2, 2)
+	icon:SetPoint("TOPLEFT", 3, -3)
+	icon:SetPoint("BOTTOMRIGHT", -3, 3)
 	icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_" .. markerIndex)
 
-	button:SetScript("OnEnter", function(self)
+	button:HookScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(_G["RAID_TARGET_" .. markerIndex] or ("Marker " .. markerIndex), classColor.r, classColor.g, classColor.b)
-		GameTooltip:AddLine("Left click: set on target", 0.8, 0.8, 0.8)
-		GameTooltip:AddLine("Right click: clear this marker from target", 0.8, 0.8, 0.8)
+		GameTooltip:AddLine("Left click: set on target", unpack(palette.mutedText))
+		GameTooltip:AddLine("Right click: clear this marker from target", unpack(palette.mutedText))
 		GameTooltip:Show()
 	end)
 
-	button:SetScript("OnLeave", function()
+	button:HookScript("OnLeave", function()
 		GameTooltip_Hide()
 	end)
 
@@ -245,7 +280,7 @@ end
 
 local function CreateUI()
 	anchor = CreateFrame("Frame", "WoWDungeonAssistRaidControlAnchor", UIParent, "SecureHandlerStateTemplate")
-	anchor:SetSize(140, 24)
+	anchor:SetSize(154, 24)
 	anchor:SetFrameStrata("MEDIUM")
 	anchor:SetMovable(true)
 	anchor:SetClampedToScreen(true)
@@ -253,14 +288,9 @@ local function CreateUI()
 	headerButton = CreateFrame("Button", nil, anchor, "BackdropTemplate")
 	headerButton:SetAllPoints(anchor)
 	headerButton:RegisterForClicks("LeftButtonUp")
-	headerButton:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		edgeSize = 8,
-		insets = { left = 2, right = 2, top = 2, bottom = 2 },
-	})
-	headerButton:SetBackdropColor(0.06, 0.06, 0.06, 0.9)
-	headerButton:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+	SetBackdropStyle(headerButton, 8)
+	headerButton:SetBackdropColor(unpack(palette.headerBg))
+	headerButton:SetBackdropBorderColor(unpack(palette.panelBorder))
 	headerButton:SetScript("OnClick", function()
 		if InCombatLockdown() then
 			return
@@ -271,10 +301,12 @@ local function CreateUI()
 		UpdateArrow()
 	end)
 
-	local title = headerButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	local title = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	title:SetPoint("CENTER", -5, 0)
 	title:SetText("Dungeon Assist")
 	title:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	title:SetShadowOffset(1, -1)
+	title:SetShadowColor(0, 0, 0, 0.9)
 
 	arrowLabel = headerButton:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	arrowLabel:SetPoint("RIGHT", -8, 0)
@@ -282,36 +314,49 @@ local function CreateUI()
 
 	dropdown = CreateFrame("Frame", nil, anchor, "BackdropTemplate")
 	dropdown:SetPoint("TOP", anchor, "BOTTOM", 0, -2)
-	dropdown:SetSize(170, 170)
+	dropdown:SetSize(178, 176)
 	dropdown:SetFrameStrata("MEDIUM")
-	dropdown:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		edgeSize = 10,
-		insets = { left = 2, right = 2, top = 2, bottom = 2 },
-	})
-	dropdown:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
-	dropdown:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+	SetBackdropStyle(dropdown, 10)
+	dropdown:SetBackdropColor(unpack(palette.panelBg))
+	dropdown:SetBackdropBorderColor(unpack(palette.panelBorder))
+
+	local dropdownShade = dropdown:CreateTexture(nil, "BACKGROUND")
+	dropdownShade:SetAllPoints(dropdown)
+	dropdownShade:SetColorTexture(0, 0, 0, 0.2)
+
+	local dropdownAccent = dropdown:CreateTexture(nil, "BORDER")
+	dropdownAccent:SetPoint("TOPLEFT", 6, -6)
+	dropdownAccent:SetPoint("TOPRIGHT", -6, -6)
+	dropdownAccent:SetHeight(1)
+	dropdownAccent:SetColorTexture(classColor.r, classColor.g, classColor.b, 0.4)
+
+	local headerAccent = headerButton:CreateTexture(nil, "BORDER")
+	headerAccent:SetPoint("BOTTOMLEFT", 4, 2)
+	headerAccent:SetPoint("BOTTOMRIGHT", -4, 2)
+	headerAccent:SetHeight(1)
+	headerAccent:SetColorTexture(classColor.r, classColor.g, classColor.b, 0.35)
 
 	headerButton:SetScript("OnEnter", function()
-		headerButton:SetBackdropColor(0.11, 0.11, 0.11, 0.95)
+		headerButton:SetBackdropColor(unpack(palette.headerHover))
+		SetClassAccentBorder(headerButton, 0.95, 0.8)
 	end)
 	headerButton:SetScript("OnLeave", function()
-		headerButton:SetBackdropColor(0.06, 0.06, 0.06, 0.9)
+		headerButton:SetBackdropColor(unpack(palette.headerBg))
+		headerButton:SetBackdropBorderColor(unpack(palette.panelBorder))
 	end)
 
-	local clearButton = CreateSecureActionButton(dropdown, "Clear Markers", 150, 22, "TOP", dropdown, "TOP", 0, -10)
+	local clearButton = CreateSecureActionButton(dropdown, "Clear Markers", 158, 22, "TOP", dropdown, "TOP", 0, -10)
 	clearButton:SetAttribute("type", "raidtarget")
 	clearButton:SetAttribute("action", "clear-all")
 
 	local markersLabel = dropdown:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	markersLabel:SetPoint("TOPLEFT", 12, -42)
+	markersLabel:SetPoint("TOPLEFT", 12, -44)
 	markersLabel:SetText("Target Markers")
 	markersLabel:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
 
 	local markerHolder = CreateFrame("Frame", nil, dropdown)
-	markerHolder:SetPoint("TOPLEFT", 10, -56)
-	markerHolder:SetSize(150, 52)
+	markerHolder:SetPoint("TOPLEFT", 11, -58)
+	markerHolder:SetSize(156, 52)
 
 	local markerOrder = { 8, 7, 6, 5, 4, 3, 2, 1 }
 	for index, markerID in ipairs(markerOrder) do
@@ -320,7 +365,7 @@ local function CreateUI()
 		CreateMarkerButton(markerHolder, markerID, "TOPLEFT", markerHolder, "TOPLEFT", col * 30, -(row * 28))
 	end
 
-	local readyButton = CreateSecureActionButton(dropdown, nil, 64, 26, "BOTTOMLEFT", dropdown, "BOTTOMLEFT", 14, 10)
+	local readyButton = CreateSecureActionButton(dropdown, nil, 66, 26, "BOTTOMLEFT", dropdown, "BOTTOMLEFT", 14, 10)
 	readyButton:SetAttribute("type", "macro")
 	readyButton:SetAttribute("macrotext", "/readycheck")
 	local readyIcon = readyButton:CreateTexture(nil, "ARTWORK")
@@ -337,7 +382,7 @@ local function CreateUI()
 		GameTooltip_Hide()
 	end)
 
-	local countdownButton = CreateSecureActionButton(dropdown, nil, 64, 26, "BOTTOMRIGHT", dropdown, "BOTTOMRIGHT", -14, 10)
+	local countdownButton = CreateSecureActionButton(dropdown, nil, 66, 26, "BOTTOMRIGHT", dropdown, "BOTTOMRIGHT", -14, 10)
 	countdownButton:SetAttribute("type", "macro")
 	countdownButton:SetAttribute("macrotext", "/countdown 10")
 	local countdownIcon = countdownButton:CreateTexture(nil, "ARTWORK")
@@ -349,6 +394,8 @@ local function CreateUI()
 	countdownText:SetPoint("LEFT", countdownIcon, "RIGHT", 4, 0)
 	countdownText:SetText("10")
 	countdownText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	countdownText:SetShadowOffset(1, -1)
+	countdownText:SetShadowColor(0, 0, 0, 0.9)
 	countdownButton:HookScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		GameTooltip:SetText("Countdown 10", classColor.r, classColor.g, classColor.b)
@@ -362,14 +409,9 @@ local function CreateUI()
 	moverOverlay:SetAllPoints(anchor)
 	moverOverlay:SetFrameStrata("DIALOG")
 	moverOverlay:RegisterForDrag("LeftButton")
-	moverOverlay:SetBackdrop({
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-		edgeSize = 10,
-		insets = { left = 2, right = 2, top = 2, bottom = 2 },
-	})
-	moverOverlay:SetBackdropColor(0.12, 0.35, 0.6, 0.45)
-	moverOverlay:SetBackdropBorderColor(0.25, 0.65, 1, 1)
+	SetBackdropStyle(moverOverlay, 10)
+	moverOverlay:SetBackdropColor(unpack(palette.moverBg))
+	moverOverlay:SetBackdropBorderColor(unpack(palette.moverBorder))
 	moverOverlay:SetScript("OnDragStart", function()
 		if InCombatLockdown() then
 			return
@@ -385,6 +427,9 @@ local function CreateUI()
 	local moverText = moverOverlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	moverText:SetPoint("CENTER")
 	moverText:SetText("Drag to move")
+	moverText:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+	moverText:SetShadowOffset(1, -1)
+	moverText:SetShadowColor(0, 0, 0, 0.9)
 	moverOverlay:Hide()
 
 	RestorePosition()
