@@ -39,7 +39,7 @@ A compact World of Warcraft party/raid control addon with a dropdown panel for m
 ## Game Version / API Notes
 
 - TOC Interface in this repo: `120001`.
-- Version in this repo: `1.2.0`.
+- Version in this repo: `1.2.1`.
 - Uses secure templates for protected actions:
   - `SecureHandlerStateTemplate` for visibility state driver.
   - `SecureActionButtonTemplate` for ready check/countdown/markers.

@@ -23,18 +23,27 @@ jobs:
 
       - name: Build addon zip
         run: |
-          mkdir -p build/WoW-Dungeon-Assist
+          ADDON_DIR="WoW-Dungeon-Assist"
+          TOC_FILE="WoW-Dungeon-Assist.toc"
 
-          rsync -av ./ build/WoW-Dungeon-Assist/ \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='.gitignore' \
-            --exclude='build' \
-            --exclude='.previews' \
-            --exclude='.DS_Store'
+          mkdir -p "build/${ADDON_DIR}"
+          cp "${TOC_FILE}" "build/${ADDON_DIR}/"
+
+          while IFS= read -r line; do
+            line="${line%$'\r'}"
+
+            if [[ -z "$line" || "$line" =~ ^# ]]; then
+              continue
+            fi
+
+            if [[ -f "$line" ]]; then
+              mkdir -p "build/${ADDON_DIR}/$(dirname "$line")"
+              cp "$line" "build/${ADDON_DIR}/$line"
+            fi
+          done < "${TOC_FILE}"
 
           cd build
-          zip -r "../WoW-Dungeon-Assist-${{ steps.version.outputs.version }}.zip" WoW-Dungeon-Assist
+          zip -r -X "../WoW-Dungeon-Assist-${{ steps.version.outputs.version }}.zip" "${ADDON_DIR}"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
